@@ -1,0 +1,29 @@
+# Пример unit-файла systemd для запуска бота на VPS (Linux).
+# Использование:
+#   1. Скопируйте: cp telegram-vacancy-bot.service.example telegram-vacancy-bot.service
+#   2. Замените USER и пути (WorkingDirectory, EnvironmentFile, ExecStart) на свои.
+#   3. Скопируйте на сервер: scp telegram-vacancy-bot.service user@server:/tmp/
+#   4. На сервере:
+#      sudo mv /tmp/telegram-vacancy-bot.service /etc/systemd/system/
+#      sudo systemctl daemon-reload
+#      sudo systemctl enable telegram-vacancy-bot
+#      sudo systemctl start telegram-vacancy-bot
+
+[Unit]
+Description=Telegram Vacancy Bot (24/7)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/hr_app
+EnvironmentFile=/home/ubuntu/hr_app/.env
+ExecStart=/usr/bin/python3 /home/ubuntu/hr_app/telegram_vacancy_bot.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/hr_app/bot.log
+StandardError=append:/home/ubuntu/hr_app/bot_error.log
+
+[Install]
+WantedBy=multi-user.target

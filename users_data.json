@@ -1,0 +1,19 @@
+{
+  "positions": {
+    "174369669": "Product manager (Fintech/Payments)",
+    "541299916": "Brand marketing & PR director"
+  },
+  "subscriptions": {
+    "174369669": {
+      "position": "Product manager (Fintech/Payments)",
+      "active": true,
+      "created_at": "2026-02-07T19:27:38.409957"
+    },
+    "541299916": {
+      "position": "Brand marketing & PR director",
+      "active": true,
+      "created_at": "2026-02-04T10:49:19.431749"
+    }
+  },
+  "last_updated": "2026-02-07T19:27:38.409982"
+}

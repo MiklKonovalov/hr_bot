@@ -1,0 +1,135 @@
+{
+  "vacancies": [
+    {
+      "title": "Payment Test Manager",
+      "company": "Кью Лид",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "between1And3",
+      "experience_name": "От 1 года до 3 лет",
+      "url": "https://hh.ru/vacancy/130432933",
+      "source": "hh.ru",
+      "published": "2026-02-13T13:20:50+0300"
+    },
+    {
+      "title": "Senior Product Owner (PayTech, HoReCa)",
+      "company": "GREEN (ГРИН)",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "between3And6",
+      "experience_name": "От 3 до 6 лет",
+      "url": "https://hh.ru/vacancy/130419912",
+      "source": "hh.ru",
+      "published": "2026-02-13T09:05:05+0300"
+    },
+    {
+      "title": "Head of Marketing (Директор по Маркетингу)",
+      "company": "Prime Property Group",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "moreThan6",
+      "experience_name": "Более 6 лет",
+      "url": "https://hh.ru/vacancy/130443239",
+      "source": "hh.ru",
+      "published": "2026-02-13T16:52:55+0300"
+    },
+    {
+      "title": "Директор по маркетингу",
+      "company": "Сеть кинотеатров КАРО",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "between3And6",
+      "experience_name": "От 3 до 6 лет",
+      "url": "https://hh.ru/vacancy/130172508",
+      "source": "hh.ru",
+      "published": "2026-02-13T15:56:49+0300"
+    },
+    {
+      "title": "CMO / Директор по маркетингу / Head of marketing",
+      "company": "VICTORY group",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "between3And6",
+      "experience_name": "От 3 до 6 лет",
+      "url": "https://hh.ru/vacancy/130172015",
+      "source": "hh.ru",
+      "published": "2026-02-13T15:44:29+0300"
+    },
+    {
+      "title": "Директор по маркетингу / Chief Marketing Officer (CMO) в Радио РБК",
+      "company": "РБК",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "moreThan6",
+      "experience_name": "Более 6 лет",
+      "url": "https://hh.ru/vacancy/130436445",
+      "source": "hh.ru",
+      "published": "2026-02-13T14:32:14+0300"
+    },
+    {
+      "title": "Руководитель маркетинга / Директор по маркетингу / Head of Marketing (B2B, EdTech, образование)",
+      "company": "LET'S HUNT",
+      "location": "Москва",
+      "salary": "от 250,000 RUR",
+      "salary_data": {
+        "from": 250000,
+        "to": null,
+        "currency": "RUR",
+        "gross": false
+      },
+      "experience": "between1And3",
+      "experience_name": "От 1 года до 3 лет",
+      "url": "https://hh.ru/vacancy/129999771",
+      "source": "hh.ru",
+      "published": "2026-02-13T12:47:02+0300"
+    },
+    {
+      "title": "Директор по маркетингу",
+      "company": "Центр Карьерной Диагностики C.R.C.",
+      "location": "Москва",
+      "salary": "до 750,000 RUR",
+      "salary_data": {
+        "from": null,
+        "to": 750000,
+        "currency": "RUR",
+        "gross": true
+      },
+      "experience": "moreThan6",
+      "experience_name": "Более 6 лет",
+      "url": "https://hh.ru/vacancy/130428196",
+      "source": "hh.ru",
+      "published": "2026-02-13T11:48:26+0300"
+    },
+    {
+      "title": "Менеджер по продажам катеров и моторных яхт (м. Улица 1905 года, ЦМТ)",
+      "company": "Burevestnik Group",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "between1And3",
+      "experience_name": "От 1 года до 3 лет",
+      "url": "https://hh.ru/vacancy/129636412",
+      "source": "hh.ru",
+      "published": "2026-02-13T10:23:48+0300"
+    },
+    {
+      "title": "Директор по маркетингу (EdTech)",
+      "company": "СИНЕРГИЯ",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "moreThan6",
+      "experience_name": "Более 6 лет",
+      "url": "https://hh.ru/vacancy/129780495",
+      "source": "hh.ru",
+      "published": "2026-02-13T08:22:55+0300"
+    }
+  ],
+  "last_updated": "2026-02-13T19:22:07.035208"
+}
