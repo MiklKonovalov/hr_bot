@@ -789,8 +789,8 @@ class TelegramVacancyBot:
         # Определяем chat_id (по умолчанию используем self.chat_id)
         target_chat_id = chat_id if chat_id else self.chat_id
         
-        # Проверяем, не была ли вакансия уже отправлена (только для основного канала)
-        if target_chat_id == self.chat_id and self._is_vacancy_sent(vacancy_url):
+        # Проверяем, не была ли вакансия уже отправлена (в общий список)
+        if self._is_vacancy_sent(vacancy_url):
             print(f"⏭️  Вакансия уже была отправлена, пропускаю: {vacancy['title']} ({vacancy_url})")
             return False
         
@@ -823,9 +823,8 @@ class TelegramVacancyBot:
                 reply_markup=reply_markup,
                 parse_mode='HTML'
             )
-            # Сохраняем вакансию как отправленную только для основного канала
-            if target_chat_id == self.chat_id:
-                self._save_sent_vacancy(vacancy_url)
+            # Помечаем вакансию как отправленную (чтобы не дублировать при «Отправить ещё»)
+            self._save_sent_vacancy(vacancy_url)
             print(f"✅ Вакансия отправлена: {vacancy['title']} в {vacancy['company']}")
             return True
         except Exception as e:
@@ -1095,8 +1094,9 @@ class TelegramVacancyBot:
         """Обработка нажатия "Нет" """
         await query.edit_message_text("✅ Понятно, сопроводительное письмо не требуется.")
     
-    async def _send_more_button(self, context: ContextTypes.DEFAULT_TYPE, remaining_count: int):
-        """Отправка сообщения с кнопкой 'Отправить ещё вакансии'"""
+    async def _send_more_button(self, context: ContextTypes.DEFAULT_TYPE, remaining_count: int, chat_id: int = None):
+        """Отправка сообщения с кнопкой 'Отправить ещё вакансии' в указанный чат (или self.chat_id)."""
+        target_chat_id = chat_id if chat_id is not None else self.chat_id
         try:
             keyboard = [
                 [InlineKeyboardButton("📤 Отправить ещё вакансии", callback_data="send_more")]
@@ -1106,7 +1106,7 @@ class TelegramVacancyBot:
             message = f"✅ Отправлено 10 вакансий!\n\n📊 Осталось вакансий: {remaining_count}\n\nНажмите кнопку, чтобы отправить ещё 10 вакансий."
             
             await context.bot.send_message(
-                chat_id=self.chat_id,
+                chat_id=target_chat_id,
                 text=message,
                 reply_markup=reply_markup,
                 parse_mode='HTML'
@@ -1128,8 +1128,9 @@ class TelegramVacancyBot:
                 except:
                     pass
             
-            # Отправляем следующие 10 вакансий
-            await self.send_all_vacancies(context, limit=10, show_more_button=True)
+            # Отправляем следующие 10 вакансий тому же пользователю, который нажал кнопку
+            user_chat_id = query.message.chat_id if query.message else (query.from_user.id if query.from_user else None)
+            await self.send_all_vacancies(context, limit=10, show_more_button=True, chat_id=user_chat_id)
         except Exception as e:
             print(f"❌ Ошибка при обработке 'Отправить ещё': {e}")
             import traceback
@@ -1846,15 +1847,18 @@ class TelegramVacancyBot:
         except Exception as e:
             print(f"⚠️ Ошибка при загрузке резюме: {e}")
     
-    async def send_all_vacancies(self, context: ContextTypes.DEFAULT_TYPE, limit: int = 10, show_more_button: bool = True):
+    async def send_all_vacancies(self, context: ContextTypes.DEFAULT_TYPE, limit: int = 10, show_more_button: bool = True, chat_id: int = None):
         """
-        Отправка вакансий из файла
+        Отправка вакансий из файла.
+        Вакансии отправляются в чат chat_id (тому, кто нажал кнопку). Если chat_id не передан — в self.chat_id (канал/чат из настроек).
         
         Args:
             context: Контекст бота
             limit: Максимальное количество вакансий для отправки за раз (по умолчанию 10)
             show_more_button: Показывать ли кнопку "Отправить ещё" после отправки
+            chat_id: ID чата, куда отправлять (обычно ID пользователя, нажавшего кнопку). None = использовать self.chat_id
         """
+        target_chat_id = chat_id if chat_id is not None else self.chat_id
         print(f"🔍 Загружаю вакансии из файла: {self.vacancies_file}")
         vacancies = self.load_vacancies()
         print(f"📊 Загружено вакансий из файла: {len(vacancies)}")
@@ -1863,7 +1867,7 @@ class TelegramVacancyBot:
             print("❌ Нет вакансий для отправки")
             try:
                 await context.bot.send_message(
-                    chat_id=self.chat_id,
+                    chat_id=target_chat_id,
                     text="❌ Нет вакансий для отправки. Убедитесь, что файл с вакансиями существует и содержит данные."
                 )
             except:
@@ -1890,7 +1894,7 @@ class TelegramVacancyBot:
             print("ℹ️  Все вакансии уже были отправлены ранее")
             try:
                 await context.bot.send_message(
-                    chat_id=self.chat_id,
+                    chat_id=target_chat_id,
                     text="ℹ️  Все вакансии уже были отправлены ранее. Используйте /clear_sent для очистки списка."
                 )
             except:
@@ -1901,13 +1905,13 @@ class TelegramVacancyBot:
         vacancies_to_send = new_vacancies[:limit]
         remaining_count = len(new_vacancies) - len(vacancies_to_send)
         
-        print(f"📤 Отправляю {len(vacancies_to_send)} вакансий (осталось {remaining_count})...")
+        print(f"📤 Отправляю {len(vacancies_to_send)} вакансий в chat_id={target_chat_id} (осталось {remaining_count})...")
         
         sent_count = 0
         failed_count = 0
         for vacancy in vacancies_to_send:
             try:
-                success = await self.send_vacancy(vacancy, context)
+                success = await self.send_vacancy(vacancy, context, chat_id=target_chat_id)
                 if success:
                     sent_count += 1
                 else:
@@ -1923,7 +1927,7 @@ class TelegramVacancyBot:
         
         # Если есть еще вакансии и нужно показать кнопку
         if remaining_count > 0 and show_more_button:
-            await self._send_more_button(context, remaining_count)
+            await self._send_more_button(context, remaining_count, chat_id=target_chat_id)
     
     def get_menu_keyboard(self) -> ReplyKeyboardMarkup:
         """Создание клавиатуры меню"""
@@ -1965,11 +1969,13 @@ class TelegramVacancyBot:
         )
     
     async def send_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /send - отправка всех вакансий"""
+        """Команда /send - отправка всех вакансий тому, кто нажал кнопку или ввёл команду"""
         menu_keyboard = self.get_menu_keyboard()
+        # Отправляем вакансии в чат того пользователя, который нажал «Отправить вакансии»
+        user_chat_id = update.effective_chat.id
         try:
             await update.message.reply_text("📤 Начинаю отправку вакансий...", reply_markup=menu_keyboard)
-            await self.send_all_vacancies(context)
+            await self.send_all_vacancies(context, chat_id=user_chat_id)
             await update.message.reply_text("✅ Отправка завершена!", reply_markup=menu_keyboard)
         except Exception as e:
             error_msg = f"❌ Ошибка при отправке: {e}"

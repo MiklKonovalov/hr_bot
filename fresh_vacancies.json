@@ -1,30 +1,6 @@
 {
   "vacancies": [
     {
-      "title": "Payment Test Manager",
-      "company": "Кью Лид",
-      "location": "Москва",
-      "salary": "Не указано",
-      "salary_data": null,
-      "experience": "between1And3",
-      "experience_name": "От 1 года до 3 лет",
-      "url": "https://hh.ru/vacancy/130432933",
-      "source": "hh.ru",
-      "published": "2026-02-13T13:20:50+0300"
-    },
-    {
-      "title": "Senior Product Owner (PayTech, HoReCa)",
-      "company": "GREEN (ГРИН)",
-      "location": "Москва",
-      "salary": "Не указано",
-      "salary_data": null,
-      "experience": "between3And6",
-      "experience_name": "От 3 до 6 лет",
-      "url": "https://hh.ru/vacancy/130419912",
-      "source": "hh.ru",
-      "published": "2026-02-13T09:05:05+0300"
-    },
-    {
       "title": "Head of Marketing (Директор по Маркетингу)",
       "company": "Prime Property Group",
       "location": "Москва",
@@ -129,7 +105,31 @@
       "url": "https://hh.ru/vacancy/129780495",
       "source": "hh.ru",
       "published": "2026-02-13T08:22:55+0300"
+    },
+    {
+      "title": "Payment Test Manager",
+      "company": "Кью Лид",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "between1And3",
+      "experience_name": "От 1 года до 3 лет",
+      "url": "https://hh.ru/vacancy/130432933",
+      "source": "hh.ru",
+      "published": "2026-02-13T13:20:50+0300"
+    },
+    {
+      "title": "Senior Product Owner (PayTech, HoReCa)",
+      "company": "GREEN (ГРИН)",
+      "location": "Москва",
+      "salary": "Не указано",
+      "salary_data": null,
+      "experience": "between3And6",
+      "experience_name": "От 3 до 6 лет",
+      "url": "https://hh.ru/vacancy/130419912",
+      "source": "hh.ru",
+      "published": "2026-02-13T09:05:05+0300"
     }
   ],
-  "last_updated": "2026-02-13T19:22:07.035208"
+  "last_updated": "2026-02-13T19:54:48.230822"
 }
