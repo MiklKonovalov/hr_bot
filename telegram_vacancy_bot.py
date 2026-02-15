@@ -374,6 +374,42 @@ class TelegramVacancyBot:
             print(f"⚠️ Ошибка при извлечении зарплаты: {e}")
             return None
     
+    def get_vacancy_by_id_from_api(self, vacancy_id: str) -> Optional[Dict]:
+        """Загрузка данных вакансии по ID из HH API (если не найдена в кеше/файле, например после перезапуска бота)."""
+        if not vacancy_id or not str(vacancy_id).strip().isdigit():
+            return None
+        try:
+            api_url = f"https://api.hh.ru/vacancies/{vacancy_id}"
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            response = requests.get(api_url, headers=headers, timeout=10)
+            if response.status_code != 200:
+                return None
+            data = response.json()
+            salary_data = data.get('salary')
+            salary_str = 'Не указано'
+            if salary_data:
+                from_val = salary_data.get('from')
+                to_val = salary_data.get('to')
+                currency = salary_data.get('currency', 'RUR')
+                if from_val and to_val:
+                    salary_str = f"{from_val:,} - {to_val:,} {currency}"
+                elif from_val:
+                    salary_str = f"от {from_val:,} {currency}"
+                elif to_val:
+                    salary_str = f"до {to_val:,} {currency}"
+            return {
+                'title': data.get('name', ''),
+                'company': (data.get('employer') or {}).get('name', ''),
+                'location': (data.get('area') or {}).get('name', ''),
+                'salary': salary_str,
+                'url': data.get('alternate_url', f'https://hh.ru/vacancy/{vacancy_id}'),
+                'source': 'hh.ru',
+                'published': data.get('published_at', ''),
+            }
+        except Exception as e:
+            print(f"⚠️ Ошибка при загрузке вакансии {vacancy_id} из API: {e}")
+        return None
+    
     def get_vacancy_description(self, vacancy_url: str) -> Optional[str]:
         """Получение описания вакансии из HH API"""
         try:
@@ -954,6 +990,13 @@ class TelegramVacancyBot:
                         print(f"✅ Вакансия найдена в файле: {vacancy['title']}")
                         break
             
+            # Если всё ещё не найдено (например, после перезапуска бота на Railway) — загружаем из HH API по ID
+            if not vacancy and str(vacancy_id).strip().isdigit():
+                print(f"🔍 Загружаю вакансию {vacancy_id} из HH API...")
+                vacancy = self.get_vacancy_by_id_from_api(vacancy_id)
+                if vacancy:
+                    print(f"✅ Вакансия загружена из API: {vacancy.get('title', '')}")
+            
             if not vacancy:
                 print(f"❌ Вакансия не найдена для vacancy_id: {vacancy_id}")
                 await query.edit_message_text("❌ Вакансия не найдена. Попробуйте отправить вакансии заново командой /send")
@@ -1168,17 +1211,18 @@ class TelegramVacancyBot:
         try:
             await query.answer("⏳ Отправляю отклик...")
             
-            # Получаем данные вакансии
+            # Получаем данные вакансии (кеш → файл → HH API)
             vacancy = None
             if hasattr(context.bot_data, 'vacancy_urls') and vacancy_id in context.bot_data.get('vacancy_urls', {}):
                 vacancy = context.bot_data['vacancy_urls'][vacancy_id]
-            else:
-                # Пытаемся загрузить из файла
+            if not vacancy:
                 vacancies = self.load_vacancies()
                 for v in vacancies:
                     if self._get_vacancy_id(v.get('url', '')) == vacancy_id:
                         vacancy = v
                         break
+            if not vacancy and str(vacancy_id).strip().isdigit():
+                vacancy = self.get_vacancy_by_id_from_api(vacancy_id)
             
             if not vacancy:
                 await query.answer("❌ Вакансия не найдена", show_alert=True)
