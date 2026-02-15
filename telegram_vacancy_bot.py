@@ -61,6 +61,7 @@ class TelegramVacancyBot:
         self.user_subscriptions = {}  # Подписки пользователей: {user_id: {'position': str, 'active': bool}}
         self.fresh_vacancies = []  # Хранилище свежих вакансий за сегодня
         self.user_sent_fresh_vacancies = {}  # Отслеживание отправленных свежих вакансий: {user_id: set(vacancy_urls)}
+        self.user_fresh_batch = {}  # Подборка 30 свежих вакансий по дате: {user_id: {'vacancies': [...], 'offset': int}}
         self.resumes_dir = 'resumes'  # Директория для сохранения резюме
         self.sent_vacancies_file = 'sent_vacancies.json'  # Файл для хранения отправленных вакансий
         self.users_data_file = 'users_data.json'  # Файл для хранения данных пользователей
@@ -1159,28 +1160,59 @@ class TelegramVacancyBot:
             print(f"❌ Ошибка при отправке кнопки 'Отправить ещё': {e}")
     
     async def handle_send_more(self, query, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка нажатия кнопки 'Отправить ещё вакансии'"""
+        """Обработка нажатия кнопки «Отправить ещё вакансии» — следующая пачка из подборки 30."""
         try:
-            # Обновляем сообщение с кнопкой
+            user_id = query.from_user.id if query.from_user else None
+            if not user_id:
+                await query.answer("Ошибка: не определён пользователь", show_alert=True)
+                return
             try:
                 await query.edit_message_text("📤 Отправляю ещё вакансии...")
-            except:
-                # Если не удалось обновить, пытаемся удалить
+            except Exception:
                 try:
                     await query.message.delete()
-                except:
+                except Exception:
                     pass
-            
-            # Отправляем следующие 10 вакансий тому же пользователю, который нажал кнопку
-            user_chat_id = query.message.chat_id if query.message else (query.from_user.id if query.from_user else None)
-            await self.send_all_vacancies(context, limit=10, show_more_button=True, chat_id=user_chat_id)
+            batch = self.user_fresh_batch.get(user_id)
+            if not batch or batch['offset'] >= len(batch['vacancies']):
+                self.user_fresh_batch.pop(user_id, None)
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="Подборка закончилась. Нажмите «Отправить вакансии» в меню для новой подборки.",
+                    reply_markup=self.get_menu_keyboard()
+                )
+                await query.answer("Подборка закончилась")
+                return
+            vacancies = batch['vacancies']
+            offset = batch['offset']
+            to_send = vacancies[offset:offset + 10]
+            sent = 0
+            for v in to_send:
+                try:
+                    if await self.send_vacancy(v, context, chat_id=user_id):
+                        sent += 1
+                    await asyncio.sleep(1)
+                except Exception as e:
+                    print(f"⚠️ Ошибка при отправке вакансии: {e}")
+            batch['offset'] = offset + len(to_send)
+            remaining = len(vacancies) - batch['offset']
+            if remaining > 0:
+                await self._send_more_fresh_button(context, remaining, chat_id=user_id)
+            else:
+                self.user_fresh_batch.pop(user_id, None)
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="✅ Подборка закончилась. Нажмите «Отправить вакансии» для новой подборки.",
+                    reply_markup=self.get_menu_keyboard()
+                )
+            await query.answer()
         except Exception as e:
             print(f"❌ Ошибка при обработке 'Отправить ещё': {e}")
             import traceback
             traceback.print_exc()
             try:
                 await query.answer(f"Ошибка: {e}", show_alert=True)
-            except:
+            except Exception:
                 pass
     
     async def handle_start_button(self, query, context: ContextTypes.DEFAULT_TYPE):
@@ -1499,22 +1531,24 @@ class TelegramVacancyBot:
             self._save_users_data()
             print(f"✅ Подписка активирована для user_id: {user_id}")
             
-            # AC1.3: Отвечаем подтверждением
+            # Подтверждаем должность, вакансии не отправляем — пользователь нажимает «Отправить вакансии» сам
+            menu_keyboard = self.get_menu_keyboard()
             try:
-                await query.edit_message_text("Отлично! Теперь буду присылать вам подборку вакансий.")
-                print("✅ Сообщение обновлено")
+                await query.edit_message_text(
+                    "✅ Должность сохранена. Нажмите «Отправить вакансии» в меню для получения актуальных вакансий."
+                )
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="Выберите действие:",
+                    reply_markup=menu_keyboard
+                )
+                print("✅ Сообщение обновлено, меню отправлено")
             except Exception as e:
                 print(f"⚠️ Ошибка при обновлении сообщения: {e}")
-                # Пытаемся отправить новое сообщение
                 try:
-                    await query.message.reply_text("Отлично! Теперь буду присылать вам подборку вакансий.")
+                    await context.bot.send_message(chat_id=user_id, text="✅ Должность сохранена. Нажмите «Отправить вакансии» в меню.", reply_markup=menu_keyboard)
                 except Exception as e2:
-                    print(f"⚠️ Ошибка при отправке нового сообщения: {e2}")
-            
-            # AC1.4: Сразу отправляем вакансии
-            print(f"🚀 Начинаю поиск и отправку вакансий для должности: {position}")
-            await self._send_vacancies_for_user(user_id, position, context)
-            print(f"✅ Поиск и отправка вакансий завершены")
+                    print(f"⚠️ Ошибка при отправке сообщения: {e2}")
             
         except Exception as e:
             print(f"❌ Ошибка при подтверждении должности: {e}")
@@ -1678,6 +1712,94 @@ class TelegramVacancyBot:
             traceback.print_exc()
             return []
     
+    def _parse_published_for_sort(self, published_str: str) -> datetime:
+        """Парсинг даты публикации для сортировки (чем позже — тем больше значение)."""
+        if not published_str:
+            return datetime.min
+        try:
+            # ISO: "2026-02-11T18:39:21+0300"
+            s = published_str.replace('+', '+').split('+')[0].split('Z')[0]
+            if 'T' in s:
+                part = s.split('T')
+                date_part = part[0]
+                time_part = part[1] if len(part) > 1 else '00:00:00'
+                return datetime.strptime(date_part + ' ' + time_part, '%Y-%m-%d %H:%M:%S')
+            return datetime.strptime(s, '%Y-%m-%d')
+        except Exception:
+            try:
+                return datetime.strptime(published_str.split('T')[0], '%Y-%m-%d')
+            except Exception:
+                return datetime.min
+    
+    def _fetch_30_fresh_vacancies_sorted(self, position: str) -> List[Dict]:
+        """
+        Загружает до 30 самых свежих вакансий по должности с HH (по дате публикации убывание:
+        сначала сегодня, потом вчера, позавчера и т.д.).
+        """
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        url = 'https://api.hh.ru/vacancies'
+        
+        def format_salary(salary_data):
+            if not salary_data:
+                return 'Не указано'
+            from_val = salary_data.get('from')
+            to_val = salary_data.get('to')
+            currency = salary_data.get('currency', 'RUR')
+            if from_val and to_val:
+                return f"{from_val:,} - {to_val:,} {currency}"
+            elif from_val:
+                return f"от {from_val:,} {currency}"
+            elif to_val:
+                return f"до {to_val:,} {currency}"
+            return 'Не указано'
+        
+        all_vacancies = []
+        seen_urls = set()
+        for page in range(3):  # до 300 результатов (3 страницы по 100)
+            params = {
+                'text': position,
+                'area': [1, 2],  # Москва и СПб
+                'per_page': 100,
+                'page': page,
+                'order_by': 'publication_time',
+            }
+            try:
+                response = requests.get(url, params=params, headers=headers, timeout=15)
+                if response.status_code != 200:
+                    break
+                data = response.json()
+                items = data.get('items', [])
+                if not items:
+                    break
+                for item in items:
+                    vac_url = item.get('alternate_url', '')
+                    if not vac_url or vac_url in seen_urls:
+                        continue
+                    seen_urls.add(vac_url)
+                    all_vacancies.append({
+                        'title': item.get('name', ''),
+                        'company': item.get('employer', {}).get('name', ''),
+                        'location': item.get('area', {}).get('name', ''),
+                        'salary': format_salary(item.get('salary')),
+                        'salary_data': item.get('salary'),
+                        'experience': item.get('experience', {}).get('id'),
+                        'experience_name': item.get('experience', {}).get('name', ''),
+                        'url': vac_url,
+                        'source': 'hh.ru',
+                        'published': item.get('published_at', '')
+                    })
+                if len(all_vacancies) >= 30:
+                    break
+            except Exception as e:
+                print(f"⚠️ Ошибка при загрузке страницы {page}: {e}")
+                break
+        
+        # Сортируем по дате публикации (новые первые)
+        all_vacancies.sort(key=lambda v: self._parse_published_for_sort(v.get('published', '')), reverse=True)
+        return all_vacancies[:30]
+    
     def _search_habr_for_position(self, position: str, finder) -> List[Dict]:
         """Поиск вакансий на Habr Career по должности"""
         try:
@@ -1738,11 +1860,8 @@ class TelegramVacancyBot:
         text = update.message.text
         
         # Обработка кнопок меню
-        if text == "🆕 Отправить свежие вакансии":
-            await self.send_fresh_vacancies_command(update, context)
-            return
-        elif text == "📤 Отправить вакансии":
-            await self.send_command(update, context)
+        if text == "📤 Отправить вакансии":
+            await self.send_fresh_batch_command(update, context)
             return
         elif text == "📄 Резюме":
             await self.resume_command(update, context)
@@ -1976,7 +2095,7 @@ class TelegramVacancyBot:
     def get_menu_keyboard(self) -> ReplyKeyboardMarkup:
         """Создание клавиатуры меню"""
         keyboard = [
-            [KeyboardButton("🆕 Отправить свежие вакансии"), KeyboardButton("📤 Отправить вакансии")],
+            [KeyboardButton("📤 Отправить вакансии")],
             [KeyboardButton("📄 Резюме"), KeyboardButton("🗑️ Очистить резюме")],
             [KeyboardButton("🔄 Очистить отправленные"), KeyboardButton("ℹ️ Помощь")],
             [KeyboardButton("📋 Меню")]
@@ -2001,7 +2120,7 @@ class TelegramVacancyBot:
         await update.message.reply_text(
             "📋 <b>Меню бота</b>\n\n"
             "Доступные функции:\n\n"
-            "📤 <b>Отправить вакансии</b> - отправить новые вакансии из файла\n"
+            "📤 <b>Отправить вакансии</b> — подборка 30 свежих вакансий по дате (пачками по 10)\n"
             "📄 <b>Резюме</b> - загрузить или посмотреть резюме\n"
             "🗑️ <b>Очистить резюме</b> - удалить загруженное резюме\n"
             "🔄 <b>Очистить отправленные</b> - очистить список отправленных вакансий\n"
@@ -2012,22 +2131,75 @@ class TelegramVacancyBot:
             parse_mode='HTML'
         )
     
-    async def send_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /send - отправка всех вакансий тому, кто нажал кнопку или ввёл команду"""
+    async def send_fresh_batch_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Отправка свежих вакансий: загружаем 30 самых свежих по дате (сегодня → вчера → позавчера...),
+        отправляем первую пачку 10, внизу кнопка «Отправить ещё вакансии».
+        """
         menu_keyboard = self.get_menu_keyboard()
-        # Отправляем вакансии в чат того пользователя, который нажал «Отправить вакансии»
-        user_chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+        position = (
+            self.user_positions.get(user_id)
+            or (self.user_subscriptions.get(user_id) or {}).get('position')
+            or 'Product Manager'
+        )
         try:
-            await update.message.reply_text("📤 Начинаю отправку вакансий...", reply_markup=menu_keyboard)
-            await self.send_all_vacancies(context, chat_id=user_chat_id)
-            await update.message.reply_text("✅ Отправка завершена!", reply_markup=menu_keyboard)
+            await update.message.reply_text("📤 Загружаю свежие вакансии...", reply_markup=menu_keyboard)
+            vacancies_30 = self._fetch_30_fresh_vacancies_sorted(position)
+            if not vacancies_30:
+                await update.message.reply_text(
+                    f"😔 По запросу «{position}» вакансий не найдено. Попробуйте позже или укажите другую должность (загрузите резюме заново).",
+                    reply_markup=menu_keyboard
+                )
+                return
+            self.user_fresh_batch[user_id] = {'vacancies': vacancies_30, 'offset': 0}
+            to_send = vacancies_30[:10]
+            sent = 0
+            for v in to_send:
+                try:
+                    if await self.send_vacancy(v, context, chat_id=user_id):
+                        sent += 1
+                    await asyncio.sleep(1)
+                except Exception as e:
+                    print(f"⚠️ Ошибка при отправке вакансии: {e}")
+            self.user_fresh_batch[user_id]['offset'] = 10
+            remaining = len(vacancies_30) - 10
+            if remaining > 0:
+                await self._send_more_fresh_button(context, remaining, chat_id=user_id)
+            else:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="✅ Отправлено 10 вакансий. Подборка закончилась. Нажмите «Отправить вакансии» для новой подборки.",
+                    reply_markup=menu_keyboard
+                )
         except Exception as e:
-            error_msg = f"❌ Ошибка при отправке: {e}"
-            print(error_msg)
+            print(f"❌ Ошибка в send_fresh_batch_command: {e}")
+            import traceback
+            traceback.print_exc()
             try:
-                await update.message.reply_text(error_msg, reply_markup=menu_keyboard)
+                await update.message.reply_text(f"❌ Ошибка: {e}", reply_markup=menu_keyboard)
             except:
-                pass  # Если не можем отправить сообщение об ошибке
+                pass
+    
+    async def _send_more_fresh_button(self, context: ContextTypes.DEFAULT_TYPE, remaining_count: int, chat_id: int):
+        """Сообщение с кнопкой «Отправить ещё вакансии» для подборки из 30."""
+        keyboard = [[InlineKeyboardButton("📤 Отправить ещё вакансии", callback_data="send_more")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        message = (
+            f"✅ Отправлено 10 вакансий!\n\n"
+            f"📊 Осталось в подборке: {remaining_count}\n\n"
+            "Нажмите кнопку, чтобы получить ещё 10 вакансий."
+        )
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=message,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+    
+    async def send_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /send — то же, что кнопка «Отправить вакансии»: свежая подборка 30, первая пачка 10."""
+        await self.send_fresh_batch_command(update, context)
     
     async def clear_sent_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда /clear_sent - очистка списка отправленных вакансий"""
@@ -2224,7 +2396,7 @@ class TelegramVacancyBot:
             "ℹ️ <b>Справка по использованию бота</b>\n\n"
             "<b>Основные команды:</b>\n"
             "/start - запустить бота и показать приветствие\n"
-            "/send - отправить новые вакансии из файла\n"
+            "/send - подборка свежих вакансий (30 по дате, пачками по 10)\n"
             "/menu - показать меню с кнопками\n"
             "/help - показать эту справку\n\n"
             "<b>Работа с резюме:</b>\n"
@@ -2232,14 +2404,14 @@ class TelegramVacancyBot:
             "/clear_resume - удалить загруженное резюме\n\n"
             "<b>Управление вакансиями:</b>\n"
             "/clear_sent - очистить список отправленных вакансий\n\n"
-            "<b>Свежие вакансии:</b>\n"
-            "🆕 Кнопка 'Отправить свежие вакансии' отправляет 10 вакансий за сегодня.\n"
-            "Бот автоматически сканирует hh.ru каждые 30 минут.\n\n"
+            "<b>Отправить вакансии:</b>\n"
+            "📤 Кнопка загружает 30 самых свежих вакансий (по дате: сегодня → вчера → позавчера…).\n"
+            "Сначала приходит 10 вакансий, внизу кнопка «Отправить ещё вакансии» — ещё по 10, всего до 30.\n\n"
             "<b>Как использовать:</b>\n"
-            "1. Загрузите резюме командой /resume или через меню\n"
-            "2. Отправьте вакансии командой /send или через меню\n"
-            "3. Для каждой вакансии выберите, нужно ли сопроводительное письмо\n"
-            "4. Если нужно - бот сгенерирует письмо на основе вашего резюме\n\n"
+            "1. Загрузите резюме командой /resume или через меню (должность подставится в поиск)\n"
+            "2. Нажмите «Отправить вакансии» — получите первую пачку из 10\n"
+            "3. Нажмите «Отправить ещё вакансии» для следующих 10 (до 30 в подборке)\n"
+            "4. Для каждой вакансии можно запросить сопроводительное письмо\n\n"
             "💡 Используйте кнопки меню для быстрого доступа к функциям!",
             reply_markup=menu_keyboard,
             parse_mode='HTML'
